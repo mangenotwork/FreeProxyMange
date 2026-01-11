@@ -8,7 +8,16 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
+	gt "github.com/mangenotwork/gathertool"
 )
+
+// 必须定义空日志器（放在函数外）
+type nullLogger struct{}
+
+func (l *nullLogger) Errorf(format string, v ...interface{})   {}
+func (l *nullLogger) Warningf(format string, v ...interface{}) {}
+func (l *nullLogger) Infof(format string, v ...interface{})    {}
+func (l *nullLogger) Debugf(format string, v ...interface{})   {}
 
 // ======================================
 // BadgerUpsertStruct：插入或更新数据（不存在则新增，存在则修改）
@@ -40,7 +49,7 @@ func BadgerUpsertStruct(dbPath string, key string, value *ProxyIP) error {
 		WithMemTableSize(16 << 20).
 		WithValueLogFileSize(64 << 20).
 		WithSyncWrites(false).
-		WithCompression(options.ZSTD)
+		WithCompression(options.ZSTD).WithLogger(&nullLogger{})
 
 	// 打开数据库
 	db, err := badger.Open(opts)
@@ -95,7 +104,7 @@ func BadgerReadStruct(dbPath string, key string) (*ProxyIP, bool, error) {
 	}
 
 	// 打开数据库（只读模式）
-	opts := badger.DefaultOptions(dbPath).WithReadOnly(true)
+	opts := badger.DefaultOptions(dbPath).WithLogger(&nullLogger{})
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, false, fmt.Errorf("打开数据库失败: %w", err)
@@ -152,7 +161,7 @@ func BadgerDeleteStruct(dbPath string, key string) error {
 		return errors.New("键不能为空")
 	}
 
-	opts := badger.DefaultOptions(dbPath).WithSyncWrites(false)
+	opts := badger.DefaultOptions(dbPath).WithLogger(&nullLogger{})
 	db, err := badger.Open(opts)
 	if err != nil {
 		return fmt.Errorf("打开数据库失败: %w", err)
@@ -197,8 +206,8 @@ func BadgerGetAllKeys(dbPath string) ([]string, error) {
 
 	// 配置：只读模式 + 禁用不必要的缓存（极致轻量）
 	opts := badger.DefaultOptions(dbPath).
-		WithSyncWrites(false).        // 关闭同步写（只读场景无意义）
-		WithCompression(options.None) // 遍历 Key 无需解压 Value，关闭压缩加速
+		WithSyncWrites(false).                                  // 关闭同步写（只读场景无意义）
+		WithCompression(options.None).WithLogger(&nullLogger{}) // 遍历 Key 无需解压 Value，关闭压缩加速
 
 	// 打开数据库
 	db, err := badger.Open(opts)
@@ -230,6 +239,6 @@ func BadgerGetAllKeys(dbPath string) ([]string, error) {
 		return nil, fmt.Errorf("查询所有 Key 失败: %w", err)
 	}
 
-	log.Printf("[查询所有 Key 成功] 路径：%s | 共查询到 %d 个 Key", dbPath, len(keys))
+	gt.Info("[查询所有 Key 成功] 路径：%s | 共查询到 %d 个 Key", dbPath, len(keys))
 	return keys, nil
 }

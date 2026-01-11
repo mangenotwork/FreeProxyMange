@@ -2,6 +2,7 @@ package serve
 
 import (
 	"FreeProxyMange/pool"
+	"FreeProxyMange/target"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -20,6 +21,10 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/all", allHandler)
 		mux.HandleFunc("/add", addHandler)
+		mux.HandleFunc("/check", checkHandler)
+		mux.HandleFunc("/get", getHandler)
+		mux.HandleFunc("/useList", useShowHandler)
+		mux.HandleFunc("/notuseList", notuseShowHandler)
 
 		// 启动 HTTP 服务，监听 8080 端口
 		httpServer := &http.Server{
@@ -103,11 +108,6 @@ func allHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. 设置响应头（JSON 格式 + 跨域支持）
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // 允许跨域（开发环境）
-	w.WriteHeader(http.StatusOK)
-
 	// 4. 返回 JSON 响应
 	_ = json.NewEncoder(w).Encode(Response{
 		Code:    200,
@@ -118,6 +118,38 @@ func allHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func addHandler(w http.ResponseWriter, r *http.Request) {
+	ipStr := r.URL.Query().Get("ip")
+
+	if ipStr == "" {
+		_ = json.NewEncoder(w).Encode(Response{
+			Code:    200,
+			Message: "ip不能为空",
+			Data:    "",
+		})
+	}
+
+	ipData := &pool.ProxyIP{
+		IP: ipStr,
+	}
+	err := ipData.Add()
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(Response{
+			Code:    200,
+			Message: "获取数据失败",
+			Data:    err.Error(),
+		})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(Response{
+		Code:    200,
+		Message: "添加成功",
+		Data:    "",
+	})
+	return
+}
+
+func checkHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. 仅允许 GET 方法
 	if r.Method != http.MethodGet {
 		// 设置响应头和状态码
@@ -142,28 +174,46 @@ func addHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	ipData := &pool.ProxyIP{
-		IP: ipStr,
-	}
-	err := ipData.Add()
-	if err != nil {
-		_ = json.NewEncoder(w).Encode(Response{
-			Code:    200,
-			Message: "获取数据失败",
-			Data:    err.Error(),
-		})
-	}
-
-	// 3. 设置响应头（JSON 格式 + 跨域支持）
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // 允许跨域（开发环境）
-	w.WriteHeader(http.StatusOK)
+	res := pool.Check(ipStr)
 
 	// 4. 返回 JSON 响应
 	_ = json.NewEncoder(w).Encode(Response{
 		Code:    200,
-		Message: "添加成功",
-		Data:    "",
+		Message: "",
+		Data:    res,
+	})
+
+}
+
+func getHandler(w http.ResponseWriter, r *http.Request) {
+	ip := target.UseIP()
+	// 4. 返回 JSON 响应
+	_ = json.NewEncoder(w).Encode(Response{
+		Code:    200,
+		Message: "",
+		Data:    ip,
+	})
+
+}
+
+func useShowHandler(w http.ResponseWriter, r *http.Request) {
+	ip := target.ShowUse()
+	// 4. 返回 JSON 响应
+	_ = json.NewEncoder(w).Encode(Response{
+		Code:    200,
+		Message: "",
+		Data:    ip,
+	})
+
+}
+
+func notuseShowHandler(w http.ResponseWriter, r *http.Request) {
+	ip := target.ShowNotUse()
+	// 4. 返回 JSON 响应
+	_ = json.NewEncoder(w).Encode(Response{
+		Code:    200,
+		Message: "",
+		Data:    ip,
 	})
 
 }

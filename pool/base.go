@@ -7,7 +7,6 @@ import (
 	"os"
 	"sort"
 	"sync"
-	"time"
 
 	gt "github.com/mangenotwork/gathertool"
 )
@@ -27,18 +26,8 @@ var tableCount = 32
 func Run(ctx context.Context, wg *sync.WaitGroup) {
 	go func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		select {
-		case <-ctx.Done():
-			gt.Info("启动池子维护任务 收到退出信号，开始停止服务...")
-			// 这里可以写收尾逻辑：关闭数据库连接、清理临时文件、保存状态等
-			time.Sleep(1 * time.Second) // 模拟收尾耗时
-			gt.Info("服务已安全停止")
-			return
 
-		default:
-			gt.Info("启动池子维护任务....")
-
-		}
+		CheckTask(ctx)
 
 	}(ctx, wg)
 }
@@ -50,6 +39,7 @@ type ProxyIP struct {
 	LastCheckTime string `json:"lastCheckTime"` // 最后检查时间
 	CheckNum      int    `json:"checkNum"`      // 检查次数
 	LastCheckMs   string `json:"lastCheckMs"`   // 最后检查IP响应时间ms
+	FailNum       int    `json:"failNum"`
 }
 
 func (p *ProxyIP) Add() error {
